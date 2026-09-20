@@ -38,45 +38,42 @@ skills/
 │   ├── examples/       # 参数示例
 │   ├── agents/         # Agent 元数据
 │   └── tests/          # 测试代码
-├── huyou/               # 狐友平台操作
-│   ├── SKILL.md
-│   ├── scripts/
-│   ├── references/
-│   ├── examples/
-│   ├── agents/
-│   └── tests/
-├── setup.ps1            # 依赖安装辅助脚本，当前缺少配套文件
-└── pack.ps1             # 打包辅助脚本，当前缺少配套文件
+└── huyou/               # 狐友平台操作
+    ├── SKILL.md
+    ├── scripts/
+    ├── references/
+    ├── examples/
+    ├── agents/
+    └── tests/
 ```
 
 每个技能目录可作为独立分发单元。真实账号绑定、任务、执行记录和依赖包放在仓库外的宿主项目中。
 
+分发时直接复制或压缩所需技能目录即可，不需要专用打包脚本；不要包含 `node_modules`、真实账号配置或运行记录。
+
 ## 快速开始
 
-以下为 Windows PowerShell 示例。需要 **Node.js 22.12+**、Git，以及已安装且本地 API 服务可用的比特浏览器。浏览器连接依赖 `puppeteer-core@25.11.0`，版本取自当前模块声明。
+需要 **Node.js 22.12+**，以及已安装且本地 API 服务可用的比特浏览器；使用克隆方式获取仓库时还需要 Git。依赖以各技能的 `package.json` 为准，当前浏览器连接需要 `puppeteer-core@25.11.0`。以下命令可用于 PowerShell、bash 或 zsh，不依赖操作系统专用安装脚本；比特浏览器本身需支持目标系统。
 
 ### 1. 创建宿主项目并获取技能
 
 在你选择的工作目录执行：
 
-```powershell
+```sh
 mkdir browser-ops-workspace
 cd browser-ops-workspace
 npm init -y
 npm install --save-exact puppeteer-core@25.11.0
 git clone https://github.com/by10457/browser-ops-skills.git skills
 
-$env:SKILL_PROJECT_ROOT = (Get-Location).Path
-$env:HUYOU_WORKSPACE = Join-Path (Get-Location).Path 'workspace'
-$env:HUYOU_BROWSER_MODULE = Join-Path (Get-Location).Path 'skills\bitbrowser\scripts\index.mjs'
-New-Item -ItemType Directory -Force -Path (Join-Path $env:HUYOU_WORKSPACE 'config') | Out-Null
+node -e "require('node:fs').mkdirSync('workspace/config', { recursive: true })"
 ```
 
-这些环境变量只对当前终端会话生效。依赖安装在宿主项目根目录，不要在 `bitbrowser/` 或 `huyou/` 内安装 `node_modules`。
+后续命令均从宿主项目根目录执行，依赖也安装在该目录，不要在 `bitbrowser/` 或 `huyou/` 内安装 `node_modules`。已有宿主项目时可直接安装依赖并放入技能，无需重新初始化。示例中的两个技能相邻存放，无需额外设置环境变量；分开放置或使用其他适配器时，参见各技能的接入说明。
 
 ### 2. 检查比特浏览器
 
-```powershell
+```sh
 node skills/bitbrowser/scripts/cli.mjs health
 node skills/bitbrowser/scripts/cli.mjs doctor
 node skills/bitbrowser/scripts/cli.mjs windows
@@ -86,7 +83,7 @@ node skills/bitbrowser/scripts/cli.mjs windows
 
 在比特浏览器中启动所需窗口，打开狐友网页并完成登录。已有窗口的标签页可这样查询：
 
-```powershell
+```sh
 node skills/bitbrowser/scripts/cli.mjs tabs --id '替换为真实窗口ID'
 ```
 
@@ -112,9 +109,9 @@ node skills/bitbrowser/scripts/cli.mjs tabs --id '替换为真实窗口ID'
 
 ### 4. 验证上下文并查询
 
-```powershell
-node skills/huyou/scripts/cli.mjs diagnose --binding account-a --workspace "$env:HUYOU_WORKSPACE"
-node skills/huyou/scripts/cli.mjs query --binding account-a --workspace "$env:HUYOU_WORKSPACE"
+```sh
+node skills/huyou/scripts/cli.mjs diagnose --binding account-a --workspace ./workspace
+node skills/huyou/scripts/cli.mjs query --binding account-a --workspace ./workspace
 ```
 
 查询条件和任务格式见 [狐友示例](huyou/examples) 与 [查询接口](huyou/references/api.md)。如果一个窗口里有多个匹配的平台标签页，需要通过相应接口指定 `targetId`，CLI 使用 `--target`。
@@ -152,7 +149,6 @@ node skills/huyou/scripts/cli.mjs query --binding account-a --workspace "$env:HU
 - 页面查询的完成状态只表示当前扫描范围，不保证已读取服务器全部内容。
 - 页面改版、登录失效或平台限流可能使操作失败，需要重新诊断。
 - 页面操作包含随机等待；它不保证平台不会限流，也不代替平台授权。
-- 根目录的 `setup.ps1` 和 `pack.ps1` 引用了尚未包含在仓库中的 `DEPENDENCIES.json`，打包脚本还引用了 `DISTRIBUTION.md`。补齐前请使用上面的手动安装方式。
 
 请仅操作自己或获授权管理的账号，遵守各平台规则。不要将密码、Cookie、令牌、真实账号配置或运行记录提交到公开仓库。
 
