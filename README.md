@@ -1,10 +1,10 @@
-# social-ops-skills
+# browser-ops-skills
 
 基于比特浏览器的多窗口、多账号社交平台自动化运营技能集，供 AI Agent 和 Node.js 程序调用。
 
 项目把浏览器窗口管理与平台操作拆成独立技能：比特浏览器负责窗口与连接，平台技能负责页面读取、账号核对、内容操作及执行结果核对。目前已包含 **比特浏览器** 和 **狐友社区**，后续可按相同结构扩展 QQ 频道、抖音、小红书、微博等平台。
 
-> 当前 GitHub 仓库地址为 `by10457/skills`；`social-ops-skills` 是本项目建议采用的名称。下文克隆命令使用现有仓库地址。
+> 项目仓库：[by10457/browser-ops-skills](https://github.com/by10457/browser-ops-skills)。
 
 ## 当前能力
 
@@ -60,11 +60,11 @@ skills/
 在你选择的工作目录执行：
 
 ```powershell
-mkdir social-ops-workspace
-cd social-ops-workspace
+mkdir browser-ops-workspace
+cd browser-ops-workspace
 npm init -y
 npm install --save-exact puppeteer-core@25.11.0
-git clone https://github.com/by10457/skills.git skills
+git clone https://github.com/by10457/browser-ops-skills.git skills
 
 $env:SKILL_PROJECT_ROOT = (Get-Location).Path
 $env:HUYOU_WORKSPACE = Join-Path (Get-Location).Path 'workspace'
