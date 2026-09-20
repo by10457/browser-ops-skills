@@ -1,0 +1,162 @@
+# social-ops-skills
+
+基于比特浏览器的多窗口、多账号社交平台自动化运营技能集，供 AI Agent 和 Node.js 程序调用。
+
+项目把浏览器窗口管理与平台操作拆成独立技能：比特浏览器负责窗口与连接，平台技能负责页面读取、账号核对、内容操作及执行结果核对。目前已包含 **比特浏览器** 和 **狐友社区**，后续可按相同结构扩展 QQ 频道、抖音、小红书、微博等平台。
+
+> 当前 GitHub 仓库地址为 `by10457/skills`；`social-ops-skills` 是本项目建议采用的名称。下文克隆命令使用现有仓库地址。
+
+## 当前能力
+
+| 模块 | 状态 | 能力 |
+| --- | --- | --- |
+| [bitbrowser](bitbrowser/SKILL.md) | 已实现 | 本地服务诊断、窗口查询与数量检查、创建/启动/关闭/删除窗口、清理 Cookie 或缓存、修改名称与备注、打开网页、标签页管理及浏览器连接 |
+| [huyou](huyou/SKILL.md) | 已实现 | 账号和圈子检查、帖子与评论查询、作者主页读取、帖子点赞、评论及回复、评论点赞、关注作者、纯文本发布、多窗口批次和结果核对 |
+| QQ 频道、抖音、小红书、微博等 | 扩展方向，尚未实现 | 后续分别增加平台适配与测试；当前不能直接调用这些平台的运营动作 |
+
+多账号任务通过“浏览器窗口 ID + 预期账号 + 平台上下文”区分操作对象。当前项目复用窗口中已有的登录状态，**不包含自动注册或通用自动登录功能**；遇到登录失效，需要先在对应窗口完成登录。
+
+## 工作方式
+
+1. 检查比特浏览器本地服务，获取真实窗口 ID 和运行状态。
+2. 准备所需窗口，在各窗口登录相应账号。
+3. 配置窗口、账号及圈子绑定，核对当前页面上下文。
+4. 查询内容，根据任务生成单项计划或多窗口批次计划。
+5. 在明确操作目标和内容后执行，记录结果；结果不确定时先核对，避免重复提交。
+
+浏览器连接结束时断开自动化连接并保留窗口。创建、启动、关闭等窗口管理操作由独立接口执行，连接已有窗口不会代替显式启动操作。
+
+## 目录结构
+
+```text
+skills/
+├── README.md
+├── bitbrowser/          # 浏览器窗口管理与连接
+│   ├── SKILL.md         # Agent 使用说明
+│   ├── scripts/        # CLI 与可导入模块
+│   ├── references/     # API、接入与管理文档
+│   ├── examples/       # 参数示例
+│   ├── agents/         # Agent 元数据
+│   └── tests/          # 测试代码
+├── huyou/               # 狐友平台操作
+│   ├── SKILL.md
+│   ├── scripts/
+│   ├── references/
+│   ├── examples/
+│   ├── agents/
+│   └── tests/
+├── setup.ps1            # 依赖安装辅助脚本，当前缺少配套文件
+└── pack.ps1             # 打包辅助脚本，当前缺少配套文件
+```
+
+每个技能目录可作为独立分发单元。真实账号绑定、任务、执行记录和依赖包放在仓库外的宿主项目中。
+
+## 快速开始
+
+以下为 Windows PowerShell 示例。需要 **Node.js 22.12+**、Git，以及已安装且本地 API 服务可用的比特浏览器。浏览器连接依赖 `puppeteer-core@25.11.0`，版本取自当前模块声明。
+
+### 1. 创建宿主项目并获取技能
+
+在你选择的工作目录执行：
+
+```powershell
+mkdir social-ops-workspace
+cd social-ops-workspace
+npm init -y
+npm install --save-exact puppeteer-core@25.11.0
+git clone https://github.com/by10457/skills.git skills
+
+$env:SKILL_PROJECT_ROOT = (Get-Location).Path
+$env:HUYOU_WORKSPACE = Join-Path (Get-Location).Path 'workspace'
+$env:HUYOU_BROWSER_MODULE = Join-Path (Get-Location).Path 'skills\bitbrowser\scripts\index.mjs'
+New-Item -ItemType Directory -Force -Path (Join-Path $env:HUYOU_WORKSPACE 'config') | Out-Null
+```
+
+这些环境变量只对当前终端会话生效。依赖安装在宿主项目根目录，不要在 `bitbrowser/` 或 `huyou/` 内安装 `node_modules`。
+
+### 2. 检查比特浏览器
+
+```powershell
+node skills/bitbrowser/scripts/cli.mjs health
+node skills/bitbrowser/scripts/cli.mjs doctor
+node skills/bitbrowser/scripts/cli.mjs windows
+```
+
+默认本地 API 地址为 `http://127.0.0.1:54345`。如本机使用其他端口，可设置 `BITBROWSER_API_URL`。窗口 ID 以查询结果为准，窗口名称和序号不能替代 ID。
+
+在比特浏览器中启动所需窗口，打开狐友网页并完成登录。已有窗口的标签页可这样查询：
+
+```powershell
+node skills/bitbrowser/scripts/cli.mjs tabs --id '替换为真实窗口ID'
+```
+
+### 3. 配置狐友账号绑定
+
+将以下示例保存为宿主项目中的 `workspace/config/huyou-bindings.json`，替换占位值：
+
+```json
+{
+  "version": 1,
+  "bindings": {
+    "account-a": {
+      "browserId": "REPLACE_WITH_REAL_WINDOW_ID",
+      "expectedAccountName": "账号昵称",
+      "expectedCircleName": "目标圈子名称",
+      "tabUrl": "https://hy.sns.sohu.com/"
+    }
+  }
+}
+```
+
+多个账号在 `bindings` 中添加不同名称的条目，并分别填写其窗口 ID 和预期账号信息。页面身份核对依赖昵称、头像等页面信息，不等同于服务端账号 UID 验证。
+
+### 4. 验证上下文并查询
+
+```powershell
+node skills/huyou/scripts/cli.mjs diagnose --binding account-a --workspace "$env:HUYOU_WORKSPACE"
+node skills/huyou/scripts/cli.mjs query --binding account-a --workspace "$env:HUYOU_WORKSPACE"
+```
+
+查询条件和任务格式见 [狐友示例](huyou/examples) 与 [查询接口](huyou/references/api.md)。如果一个窗口里有多个匹配的平台标签页，需要通过相应接口指定 `targetId`，CLI 使用 `--target`。
+
+## 操作计划与批次
+
+狐友写入操作采用以下流程：
+
+| 阶段 | 用途 |
+| --- | --- |
+| `prepare` | 生成包含账号、目标和正文的操作计划 |
+| `rehearse` | 检查表单并清理工具输入，不提交内容 |
+| `execute` | 执行已明确授权的操作 |
+| `reconcile` | 核对先前执行结果，处理不确定状态 |
+
+多窗口、多目标任务提供对应的 `batch-prepare`、`batch-rehearse`、`batch-execute`、`batch-reconcile` 命令。详细参数见 [单项操作](huyou/references/actions.md) 和 [批次操作](huyou/references/batches.md)。
+
+同一运行目录提供窗口互斥与防重记录。多个任务操作同一窗口时，应共用运行目录；执行期间避免人工同时编辑页面。`verified-ui` 表示取得页面证据，`uncertain` 表示尚无法确认，应先核对而不是直接重发。
+
+## 扩展其他平台
+
+建议每个平台单独建立技能目录，沿用 `SKILL.md`、`scripts/`、`references/`、`examples/`、`tests/` 的结构：
+
+1. 复用浏览器连接层，或提供兼容的浏览器适配器。
+2. 实现该平台的登录状态、账号身份与页面就绪检查。
+3. 优先完成内容读取与导航，再增加发布或互动操作。
+4. 为写入动作定义目标定位、操作计划、执行结果和失败核对方式。
+5. 提供模拟页面测试、参数示例及平台特有的使用限制。
+
+狐友模块可作为现有实现参考；不同平台的页面结构和能力各不相同，不能仅替换网址就复用全部动作。
+
+## 当前限制
+
+- 狐友发布目前支持纯文本及分区选择，不支持附件；回复目标限顶层评论。
+- 页面查询的完成状态只表示当前扫描范围，不保证已读取服务器全部内容。
+- 页面改版、登录失效或平台限流可能使操作失败，需要重新诊断。
+- 页面操作包含随机等待；它不保证平台不会限流，也不代替平台授权。
+- 根目录的 `setup.ps1` 和 `pack.ps1` 引用了尚未包含在仓库中的 `DEPENDENCIES.json`，打包脚本还引用了 `DISTRIBUTION.md`。补齐前请使用上面的手动安装方式。
+
+请仅操作自己或获授权管理的账号，遵守各平台规则。不要将密码、Cookie、令牌、真实账号配置或运行记录提交到公开仓库。
+
+## 文档入口
+
+- [比特浏览器技能](bitbrowser/SKILL.md) · [接入说明](bitbrowser/references/setup.md) · [窗口管理](bitbrowser/references/management.md) · [诊断](bitbrowser/references/diagnostics.md)
+- [狐友技能](huyou/SKILL.md) · [接入说明](huyou/references/setup.md) · [查询 API](huyou/references/api.md) · [单项操作](huyou/references/actions.md) · [批次操作](huyou/references/batches.md)
