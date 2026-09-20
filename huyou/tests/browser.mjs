@@ -13,12 +13,15 @@ import {queryComments} from '../scripts/comments.mjs';
 import {diagnoseHuyou,listCircles,setFeedSort,selectCircle} from '../scripts/context.mjs';
 import {openUserProfile,closeUserProfile} from '../scripts/profiles.mjs';
 import {prepareFollowUser,followUser} from '../scripts/actions/follow-user.mjs';
-const id=process.argv[3];if(process.argv[2]!=='--id'||!id)throw Error('Provide --id of a running window');
+import {createRequire} from 'node:module';
+import {recoverInteractionPage} from '../scripts/operations.mjs';
+const id=process.argv[3];if(!['--id','--executable'].includes(process.argv[2])||!id)throw Error('Provide --id or --executable');
+const runBrowser=process.argv[2]==='--id'?withBrowser:async(_,fn)=>{const p=createRequire(path.join(process.cwd(),'package.json'))('puppeteer-core');const b=await p.launch({executablePath:id,headless:true});try{return await fn(b);}finally{await b.close();}};
 const html=await readFile(new URL('./fixtures/site.html',import.meta.url),'utf8');
 const binding={browserId:id,expectedAccountName:'operator',expectedCircleName:'circle'};
 const dir=await mkdtemp(path.join(os.tmpdir(),'browser-skill-browser-tests-'));
 let passed=0,intercepted=0;
-try{await withBrowser({id},async browser=>{
+try{await runBrowser({id},async browser=>{
   const context=await browser.createBrowserContext();
   try{
     async function test(name,task,check){
@@ -48,6 +51,13 @@ try{await withBrowser({id},async browser=>{
       const r=await queryComments(page,binding,'123',{limit:2});assert.equal(r.comments.length,2);assert.equal(r.complete,true);assert.equal(r.loads,1);assert.equal(await page.evaluate(()=>fixture.submits),0);
     });
     const base={version:2,binding:'fixture',target:{postId:'123'}};
+    await test('unified follow and explicit page recovery',base,async({page,adapter})=>{
+      await page.evaluate(()=>{const original=detail;detail=id=>{original(id);const img=document.createElement('img');img.className='feed-header__avatar';img.src='author.png';const b=document.createElement('button');b.className='feed-header__follow-btn';b.textContent='关注';b.setAttribute('aria-pressed','false');b.onclick=()=>{fixture.submits++;b.textContent='已关注';b.setAttribute('aria-pressed','true');};document.querySelector('.feed-detail-content').append(img,b);};});
+      const plan=await buildActionPlan({...base,action:'follow-user'},binding,adapter);
+      assert.equal((await executePlan(plan,adapter,new Journal(path.join(dir,'unified-follow')))).status,'verified-ui');
+      const recovered=await recoverInteractionPage({page,binding,workspace:dir});assert.equal(recovered.closedDetail,true);assert.equal(await page.$('.feed-detail'),null);
+      assert.equal(await page.evaluate(()=>fixture.submits),1);
+    });
     await test('follow author submits once without opening a profile',base,async({page})=>{
       await page.evaluate(()=>{const original=detail;detail=id=>{original(id);const b=document.createElement('button');b.className='feed-header__follow-btn';const avatar=document.createElement('img');avatar.className='feed-header__avatar';avatar.src='author.png';document.querySelector('.feed-detail-content').append(avatar);b.textContent='关注';b.setAttribute('aria-pressed','false');b.onclick=()=>{fixture.submits++;b.textContent='已关注';b.setAttribute('aria-pressed','true');};document.querySelector('.feed-detail-content').append(b);};});
       const count=(await context.pages()).length;

@@ -12,7 +12,7 @@ export const hash = value => createHash('sha256').update(JSON.stringify(canonica
 export function validateActionTask(input) {
   const t = structuredClone(input);
   if (!t || t.version !== 2 || !(typeof t.binding==='string'&&t.binding.trim()||t.binding&&typeof t.binding==='object'&&!Array.isArray(t.binding)&&t.binding.browserId&&t.binding.expectedAccountName&&t.binding.expectedCircleName)) fail('INVALID_TASK', '操作任务需要 version:2 和 binding 名称或对象');
-  if (!['comment', 'reply', 'publish', 'like-comment', 'like-post'].includes(t.action)) fail('INVALID_ACTION', '不支持的操作类型');
+  if (!['comment', 'reply', 'publish', 'like-comment', 'like-post', 'follow-user'].includes(t.action)) fail('INVALID_ACTION', '不支持的操作类型');
   const allowed = ['version', 'binding', 'action', 'target', 'content', 'publication'];
   if (Object.keys(t).some(k => !allowed.includes(k))) fail('INVALID_TASK', '任务包含未知字段；提交仅通过 execute 命令触发');
   if (t.action !== 'publish') {
@@ -57,5 +57,6 @@ export function verifyPlan(plan, now = Date.now()) {
   return plan;
 }
 export function operationKey(plan) {
+  if(plan.task.action==='follow-user')return hash(['follow-user',plan.binding.browserId,plan.evidence.account,plan.evidence.follow.author]);
   return hash({ browserId: plan.binding.browserId, account: plan.evidence.account, circle: plan.binding.expectedCircleName, action: plan.task.action, postId: plan.task.target?.postId, comment: plan.evidence.comment ? identity(plan.evidence.comment) : null, content: plan.task.content, publication: plan.task.publication });
 }

@@ -5,6 +5,7 @@ import { ui, checkAccount, ensureNoDraft, uniqueClick, exactTextClick, openDetai
 import { checkQuickLike, POST_LIKE_STICKER } from './dom.mjs';
 import {locatePost} from '../../posts.mjs';
 import {editableText} from './dom.mjs';
+import {prepareFollowUser} from '../../actions/follow-user.mjs';
 
 export class HuyouAdapter {
   constructor(page, binding, { verifyTimeout = 12000 } = {}) { this.page=page; this.binding=binding; this.verifyTimeout=verifyTimeout; }
@@ -34,6 +35,10 @@ export class HuyouAdapter {
     const d=await readDetail(page);
     if (d.postId!==task.target.postId || d.circleName!==this.binding.expectedCircleName) fail('POST_CONTEXT_MISMATCH','详情帖子或圈子与任务不符');
     const evidence={account,post:postEvidence(d),identityStrength:'name-and-avatar-not-uid'};
+    if(task.action==='follow-user') {
+      evidence.follow=await prepareFollowUser(page,this.binding,task.target);
+      if(expected?.follow&&hash(evidence.follow.author)!==hash(expected.follow.author))fail('AUTHOR_CHANGED','作者变化');
+    }
     if(task.action==='like-post') {
       evidence.reaction=await checkQuickLike(page,{open:true});
       if(expected?.reaction && hash(evidence.reaction)!==hash(expected.reaction)) fail('POST_LIKE_CHANGED','点赞表情与计划不符');
@@ -76,11 +81,13 @@ export class HuyouAdapter {
   }
   async stage(task,evidence) {
     const page=this.page;
+    if(task.action==='follow-user')return {kind:'follow-user'};
     if(task.action==='like-post') {
       await checkQuickLike(page,{open:true});
-      const beforeMatches=this.matches(await readDetail(page),task,evidence).length;
+      const detail=await readDetail(page);
+      const beforeMatches=this.matches(detail,task,evidence).length;
       if(beforeMatches) fail('EXISTING_IDENTICAL_CONTENT','已加载评论中存在当前账号的点赞表情，不重复发送');
-      return {kind:'like-post',beforeMatches,sticker:POST_LIKE_STICKER};
+      return {kind:'like-post',beforeMatches,sticker:POST_LIKE_STICKER,beforeFastComments:detail.fastComments};
     }
     if(task.action==='like-comment') {
       const {comment}=await findCommentHandle(page,evidence.comment);
@@ -123,6 +130,11 @@ export class HuyouAdapter {
   async assertStaged(task,evidence) {
     const page=this.page;
     await checkAccount(page,this.binding.expectedAccountName,evidence.account);
+    if(task.action==='follow-user') {
+      const current=await prepareFollowUser(page,this.binding,task.target);
+      if(hash(current.author)!==hash(evidence.follow.author))fail('AUTHOR_CHANGED','作者变化');
+      return;
+    }
     if(task.action==='publish') {
       const p=await readPublish(page);
       if(p.circleName!==evidence.publication.circleName || p.board!==(evidence.publication.board||null) || normalizeText(p.editorText)!==task.content.text || p.statement!==task.publication.statement || p.hasMedia) fail('FORM_CHANGED','发布表单与计划不一致');
@@ -145,9 +157,17 @@ export class HuyouAdapter {
   async submit(task,evidence) {
     await pauseBeforeOperation();
     await this.assertStaged(task,evidence);
+    if(task.action==='follow-user') {
+      const s=await prepareFollowUser(this.page,this.binding,task.target);
+      if(s.followState==='followed')return {alreadyFollowed:true};
+      await uniqueClick(this.page,'.feed-detail-content .feed-header__follow-btn');return {};
+    }
     // Called only after the durable pending record is written.
     if(task.action==='like-post') {
       await checkQuickLike(this.page);
+      this.submissionResponses=[];
+      this.responseListener=r=>{try{if(r.request().method()==='POST'&&this.submissionResponses.length<20){const u=new URL(r.url());this.submissionResponses.push({origin:u.origin,path:u.pathname,status:r.status()});}}catch{}};
+      this.page.on('response',this.responseListener);
       await uniqueClick(this.page,ui.quickLike);
       return {};
     }
@@ -175,7 +195,12 @@ export class HuyouAdapter {
     }
     if(new URL(this.page.url()).searchParams.get('feedDetail')!==task.target.postId) return null;
     const d=await readDetail(this.page);
+    if(task.action==='like-post')this.lastFastComments=d.fastComments;
     if(hash(postEvidence(d))!==hash(evidence.post)) return null;
+    if(task.action==='follow-user') {
+      const s=await prepareFollowUser(this.page,this.binding,task.target);
+      return s.followState==='followed'&&hash(s.author)===hash(evidence.follow.author)?{source:'explicit-followed-state',author:s.author}:null;
+    }
     if(task.action==='like-comment') {
       const c=matchComment(d.comments,evidence.comment);
       if(c.like.state==='liked') return {source:'explicit-liked-state',like:c.like};
@@ -198,8 +223,9 @@ export class HuyouAdapter {
       }
       await new Promise(r=>setTimeout(r,250));
     }
-    return {status:'uncertain',reason:'提交后没有取得足够的页面证据；禁止自动重发'};
+    return {status:'uncertain',reason:'提交后没有取得足够的页面证据；禁止自动重发',...(task.action==='like-post'?{verification:{method:'own-sticker-in-loaded-comments',limitation:'普通评论读取不保证覆盖独立表情评论区',beforeFastComments:baseline.beforeFastComments,afterFastComments:this.lastFastComments,observedPostResponses:this.submissionResponses||[],responseMeaning:'仅请求元数据和计数；HTTP 成功或计数增长不证明本人操作成功'},nextAction:'reconcile-or-user-confirmation'}:{})};
   }
+  dispose(){if(this.responseListener){this.page.off('response',this.responseListener);this.responseListener=null;}}
   async cleanup(originalURL) {
     await this.clearOwnDraft();
     if(await this.page.$(ui.quickMenu)) await uniqueClick(this.page,ui.quickTrigger);

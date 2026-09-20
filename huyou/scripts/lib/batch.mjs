@@ -5,7 +5,7 @@ import { bindingFor, withLock } from './runner.mjs';
 import { runAction } from './actions/runner.mjs';
 import { hash, fail, validateActionTask, verifyPlan, operationKey } from './actions/schema.mjs';
 
-const success = new Set(['verified-ui','skipped-duplicate','skipped-already-liked','rehearsed']);
+const success = new Set(['verified-ui','skipped-duplicate','skipped-already-liked','skipped-already-followed','confirmed-by-user','rehearsed']);
 const uncertain = new Set(['running','uncertain','blocked-uncertain']);
 const allowed = (obj, keys) => obj && typeof obj === 'object' && !Array.isArray(obj) && Object.keys(obj).every(k=>keys.includes(k));
 export function validateBatch(input) {

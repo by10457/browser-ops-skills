@@ -43,6 +43,8 @@ const result = await withHuyou(
 
 ## 独立动作
 
+新任务可以统一使用 prepareInteraction/executeInteraction，包括 follow-user。批次便捷入口、操作历史、人工确认和页面恢复见 [通用编排](orchestration.md)。
+
 公开函数对：prepareLikePost / likePost、prepareLikeComment / likeComment、prepareComment / comment、prepareReply / reply、preparePublish / publish。各自位于 scripts/actions 中独立文件，复用同一套验证与防重实现。
 
 ```js

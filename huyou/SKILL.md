@@ -29,6 +29,8 @@ description: 查询狐友圈子帖子、评论和用户主页，执行点赞、�
 
 ## 执行流程
 
+新任务优先使用统一的 prepareInteraction/executeInteraction；批量帖子、作者去重、执行历史和页面恢复见 [通用编排](references/orchestration.md)。旧函数继续兼容。不要导入 lib 内部点击函数绕过操作日志和核对。
+
 1. diagnoseHuyou 检查登录、圈子与草稿；必要时通过导航函数选择目标圈子和新发排序。查询目标，检查 complete、stopReason 和 warnings；有歧义时补充条件，不任取第一条。
 2. prepare 生成包含账号、目标和正文的计划，有效期 15 分钟。
 3. 需要表单演练时使用 rehearse，只检查并清理工具输入，不提交。

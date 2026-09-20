@@ -77,7 +77,9 @@ export async function readDetail(page) {
         like:{ state:pressed==='true' || like?.getAttribute('aria-label')==='取消评论点赞' ? 'liked' : pressed==='false' || src?.endsWith('/ic_Icon_like_c@3x.png') ? 'unliked' : 'unknown', icon:src, count:Number(like?.innerText.trim() || 0) }
       };
     });
-    return { postId:new URL(location.href).searchParams.get('feedDetail'), authorName:root.querySelector('.feed-detail-content .feed-header__name')?.innerText.trim(), text:rich(root.querySelector('.feed-detail-content__body .feed-rich-text')), circleName:root.querySelector('.feed-circle-tag__name')?.innerText.trim(), comments };
+    const fastLabel=root.querySelector('.feed-detail-comments__fast-count')?.textContent.trim()||null;
+    const fastMatch=/^(\d+)条表情评论\s*$/.exec(fastLabel||'');
+    return { postId:new URL(location.href).searchParams.get('feedDetail'), authorName:root.querySelector('.feed-detail-content .feed-header__name')?.innerText.trim(), text:rich(root.querySelector('.feed-detail-content__body .feed-rich-text')), circleName:root.querySelector('.feed-circle-tag__name')?.innerText.trim(), comments, fastComments:{count:fastMatch?Number(fastMatch[1]):null,label:fastLabel,identityAvailable:false} };
   });
 }
 export async function closeDetail(page) {

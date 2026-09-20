@@ -8,9 +8,12 @@ export async function buildActionPlan(task,binding,adapter,{now=Date.now()}={}) 
 export async function executePlan(plan,adapter,journal,{now=Date.now()}={}) {
   verifyPlan(plan,now);
   const key=operationKey(plan);const prior=await journal.get(key);
-  if(prior) return {status:['verified-ui','skipped-already-liked'].includes(prior.status)?'skipped-duplicate':'blocked-uncertain',operationKey:key,previous:prior.status};
+  if(prior) return {status:['verified-ui','skipped-already-liked','skipped-already-followed','confirmed-by-user'].includes(prior.status)?'skipped-duplicate':'blocked-uncertain',operationKey:key,previous:prior.status};
   const current=await adapter.prepare(plan.task,plan.evidence);
   if(hash(current.account)!==hash(plan.evidence.account))fail('ACCOUNT_CHANGED','账号变化');
+  if(plan.task.action==='follow-user'&&current.follow.followState==='followed') {
+    const result={status:'skipped-already-followed',operationKey:key};await journal.begin(key,result);return result;
+  }
   if(plan.task.action==='like-comment'&&current.comment.like.state==='liked') {
     const result={status:'skipped-already-liked',operationKey:key,at:new Date().toISOString()};await journal.begin(key,result);return result;
   }
@@ -22,7 +25,7 @@ export async function executePlan(plan,adapter,journal,{now=Date.now()}={}) {
   try {
     // Once pending is durable, any exception is uncertain, even if the click timed out.
     const submitted=await adapter.submit(plan.task,current);
-    result=submitted.alreadyLiked?{status:'skipped-already-liked'}:await adapter.verify(plan.task,current,baseline);
+    result=submitted.alreadyFollowed?{status:'skipped-already-followed'}:submitted.alreadyLiked?{status:'skipped-already-liked'}:await adapter.verify(plan.task,current,baseline);
   } catch(e) { result={status:'uncertain',code:e.code||'SUBMIT_OR_VERIFY_FAILED',reason:'可能已经提交，先核对结果，不自动重发'}; }
   try { await journal.finish(key,{...record,...result,finishedAt:new Date().toISOString()}); }
   catch { return {status:'uncertain',operationKey:key,code:'JOURNAL_UPDATE_FAILED',reason:'提交后的记录更新失败，pending 记录保留，禁止重发'}; }
@@ -32,7 +35,8 @@ export async function reconcilePlan(plan,adapter,journal) {
   verifyPlan(plan,0); // Expiry only limits submissions; reconciliation is read-only.
   const key=operationKey(plan),prior=await journal.get(key);
   if(!prior)fail('NO_OPERATION','没有需要核对的提交记录');
-  if(['verified-ui','skipped-already-liked'].includes(prior.status))return {status:prior.status,operationKey:key};
+  if(['verified-ui','skipped-already-liked','skipped-already-followed','confirmed-by-user'].includes(prior.status))return {status:prior.status,operationKey:key};
+  if(!prior.baseline)return {status:'uncertain',operationKey:key,reason:'外部记录缺少提交前基线，不能自动核验；保留记录，等待独立证据或用户确认'};
   // May leave a draft after a timed-out submit. Do not overwrite or silently clear it.
   if(plan.task.action!=='publish') await adapter.prepare(plan.task,plan.evidence);
   const evidence=await adapter.verifyOnce(plan.task,plan.evidence,prior.baseline);

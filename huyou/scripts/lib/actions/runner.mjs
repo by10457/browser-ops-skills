@@ -42,6 +42,7 @@ export async function runAction({workspace,command,task,plan,bindingName,postId,
         else fail('UNKNOWN_COMMAND','未知操作命令');
         return result;
       } finally {
+        adapter.dispose();
         // Keep uncertain submissions visible for manual inspection; don't discard their drafts.
         if(!['uncertain','blocked-uncertain'].includes(result?.status)) {
           try{await adapter.cleanup(originalURL);}catch(e){cleanupWarning=e.code||'PAGE_NOT_RESTORED';}

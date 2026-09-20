@@ -4,6 +4,8 @@
 
 ## 关注帖子作者
 
+新的高层调用优先使用 `prepareInteraction({workspace,binding,action:'follow-user',target:{postId}})` 和 `executeInteraction({workspace,plan})`，与点赞等动作一致，并支持统一批次与核对。下面的 page 形式继续保留用于会话内兼容；两种计划格式不可混用。详见 [通用编排](orchestration.md)。
+
 在 withHuyou 回调内调用，确保同一窗口的互斥锁覆盖准备与执行：
 
 ```js
