@@ -1,0 +1,15 @@
+# 独立接入
+
+整个 huyou 文件夹是分发单元，不携带依赖包、账号配置或运行记录。Node.js 版本见 package.json。
+
+浏览器连接支持三种方式：
+
+1. 设置 HUYOU_BROWSER_MODULE 为浏览器技能 scripts/index.mjs 的绝对路径。模块需导出 withBrowser、listTabs、selectTab；采用比特技能时依赖由宿主项目安装，使用其自身接入说明。
+2. 调用 configureBrowser(adapter)，注入相同接口。withBrowser(selector,callback) 负责连接、调用及断开，保留原窗口；listTabs 返回 page、targetId、url、title。
+3. 读取与导航直接调用函数传入 Puppeteer 兼容 page，或 withHuyou({page,binding},callback)。调用方负责页面生命周期与同窗口互斥，不自动加锁或断开外部 page。动作计划与批次仍通过浏览器适配器取得窗口。
+
+未配置时兼容同级 bitbrowser 目录，但它不是必须的布局。纯查询筛选函数和导入本技能不要求比特模块存在。
+
+绑定对象：`{browserId,expectedAccountName,expectedCircleName}`，可选 tabUrl。withHuyou 和单项动作的 binding 可直接传对象，或传 workspace/config/huyou-bindings.json 中的绑定名称。直接传入 page 时读取绑定只需要预期账号、圈子；发送动作需要 browserId。
+
+运行目录必须通过 workspace 或 HUYOU_WORKSPACE 明确指定，不再由技能位置推导。与比特管理任务共用 workspace 时共享窗口锁。若迁移旧调用，补上 workspace 即可。发布正文与动作授权仍由调用方决定。

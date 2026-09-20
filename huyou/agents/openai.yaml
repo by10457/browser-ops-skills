@@ -1,0 +1,4 @@
+interface:
+  display_name: "狐友圈子运营"
+  short_description: "读取圈子、准备评论回复和发布计划，单窗口执行并验证结果，防止重复提交"
+  default_prompt: "使用 $huyou 核对指定圈子的目标和内容，先生成操作计划。"

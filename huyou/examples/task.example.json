@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "binding": "my-circle",
+  "action": "inspect-posts",
+  "selection": { "order": "newest", "distinctBy": "none", "limit": 10 },
+  "execution": { "mode": "preview" }
+}

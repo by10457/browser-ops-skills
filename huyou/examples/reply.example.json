@@ -1,0 +1,1 @@
+{"version":2,"binding":"my-circle","action":"reply","target":{"postId":"123","comment":{"authorName":"目标评论作者","text":"目标评论的完整正文"}},"content":{"text":"替换为用户确定的回复正文"}}

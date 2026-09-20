@@ -1,0 +1,4 @@
+interface:
+  display_name: "比特浏览器"
+  short_description: "查询窗口需求缺口，按授权管理窗口与清理数据，并为网站操作提供连接"
+  default_prompt: "使用 $bitbrowser 检查所需窗口，说明缺口并在获得授权后准备和执行窗口管理操作。"

@@ -1,0 +1,12 @@
+{
+  "version":1,
+  "bindings":{
+    "my-circle":{
+      "browserId":"REPLACE_WITH_REAL_WINDOW_ID",
+      "windowName":"Your window name",
+      "expectedAccountName":"Your account nickname",
+      "expectedCircleName":"Your circle name",
+      "tabUrl":"https://hy.sns.sohu.com/"
+    }
+  }
+}

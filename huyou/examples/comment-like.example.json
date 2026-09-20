@@ -1,0 +1,1 @@
+{"version":2,"binding":"my-circle","action":"like-comment","target":{"postId":"123","comment":{"authorName":"目标评论作者","text":"目标评论的完整正文"}}}

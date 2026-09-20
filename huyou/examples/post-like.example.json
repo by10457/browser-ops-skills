@@ -1,0 +1,6 @@
+{
+  "version": 2,
+  "binding": "my-circle",
+  "action": "like-post",
+  "target": {"postId": "POST_ID"}
+}

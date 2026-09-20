@@ -1,0 +1,16 @@
+{
+  "name": "bitbrowser-skill",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./scripts/index.mjs",
+    "./cli-utils": "./scripts/lib/cli.mjs"
+  },
+  "dependencies": {
+    "puppeteer-core": "25.11.0"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
