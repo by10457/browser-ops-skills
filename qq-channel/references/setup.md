@@ -24,6 +24,16 @@ expectedChannelAccountName 在发送时必需；只读可省略。可选 expecte
 
 binding 也可为配置名称，查找 workspace/config/qq-channel-bindings.json：`{"version":1,"bindings":{"operator":{...}}}`。不要把账号绑定放在技能目录。
 
-workspace 必須显式传入或通过 QQ_CHANNEL_WORKSPACE 指定。动作记录在 workspace/qq-channel/operations，运行记录与计划在 workspace/qq-channel/runs。窗口锁为 workspace/locks/<browserId>.lock；同一窗口的任务应使用相同 workspace。
+workspace 必須显式传入或通过 QQ_CHANNEL_WORKSPACE 指定。动作记录在 workspace/operations/qq-channel，运行记录与计划在 workspace/runs/qq-channel。窗口锁为 workspace/locks/<browserId>.lock；同一窗口的任务应使用相同 workspace。
 
 多个 pd.qq.com 标签时需要 targetId。浏览器断开连接后保留用户页面，不自动关闭或切换其他窗口。
+
+存储按平台隔离：操作账本 operations/qq-channel，运行证据 runs/qq-channel；workspace 始终为宿主工作区根目录，locks 保持共享。升级前暂停任务，将旧账本原样迁入新路径，保留操作键和内容；发现旧账本时报 STORAGE_MIGRATION_REQUIRED，不能通过删除账本绕过。历史结果中的 runDir/planFile 可能仍是旧路径，按迁移清单定位，勿改已封存计划。
+
+## 可选平台项目布局
+
+宿主 config/storage.json 可配置：
+```json
+{"version":1,"platforms":{"huyou":"project/huyou","qq-channel":"project/qq-channel"}}
+```
+配置后，绑定从平台项目的 config 读取，operations/runs/drafts/recovery 存于平台项目内部。workspace 仍传宿主根目录，locks 两平台共享。没有配置文件时保持默认按平台分类布局。修改配置前迁移既有账本；不能只切路径开始新账本。配置路径相对于宿主根目录，不依赖命令的当前目录。

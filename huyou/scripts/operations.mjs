@@ -1,3 +1,4 @@
+import {storage} from './storage.mjs';
 import {readdir,mkdir,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
@@ -27,7 +28,7 @@ export async function recoverOwnedDraft(options){
     await adapter.assertStaged(plan.task,plan.evidence);
     const extra=await page.evaluate(selector=>[...document.querySelectorAll('input[type=file]')].some(e=>e.files?.length)||[...document.querySelectorAll('.detail-input__textarea,.publish-editor__content')].some(e=>!e.matches(selector)&&(e.value??e.innerText)?.trim()),record.selector);
     if(extra)fail('EXISTING_DRAFT','存在其他草稿或附件，保留现场');
-    const dir=path.join(workspacePath(workspace),'recovery',randomUUID());await mkdir(dir,{recursive:true});
+    const dir=storage(workspacePath(workspace),'recovery',randomUUID());await mkdir(dir,{recursive:true});
     await writeFile(path.join(dir,'draft.json'),JSON.stringify(record,null,2));
     await page.screenshot({path:path.join(dir,'page.png')});
     adapter.ownDraft=record;await adapter.clearOwnDraft();
@@ -61,7 +62,7 @@ export async function recoverInteractionPage(options){
   return withHuyou({...options,requireContext:false},async({page,binding,workspace})=>{
     await pauseBeforeOperation();await checkAccount(page,binding.expectedAccountName);await ensureNoDraft(page);
     assertContext(await readSnapshot(page),binding);
-    const dir=path.join(workspacePath(workspace),'recovery',randomUUID());await mkdir(dir,{recursive:true});
+    const dir=storage(workspacePath(workspace),'recovery',randomUUID());await mkdir(dir,{recursive:true});
     const detail=await page.$('.feed-detail')?await readDetail(page):null;
     await writeFile(path.join(dir,'snapshot.json'),JSON.stringify({url:page.url(),detail,at:new Date().toISOString()},null,2));
     await page.screenshot({path:path.join(dir,'page.png')});

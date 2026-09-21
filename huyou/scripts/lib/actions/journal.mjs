@@ -1,9 +1,15 @@
+import {storage} from '../../storage.mjs';
 import { mkdir, open, readFile, rename } from 'node:fs/promises';
 import path from 'node:path';
+import {existsSync,readdirSync} from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { fail } from './schema.mjs';
 export class Journal {
-  constructor(workspace){this.dir=path.join(workspace,'operations');}
+  constructor(workspace){
+    const legacy=path.join(workspace,'operations');
+    if(existsSync(legacy)&&readdirSync(legacy).some(n=>/^[a-f0-9]{64}\.json$/.test(n)))fail('STORAGE_MIGRATION_REQUIRED','请先迁移旧操作账本到 operations/huyou，禁止忽略历史记录继续提交');
+    this.dir=storage(workspace,'operations');
+  }
   file(key){ if(!/^[a-f0-9]{64}$/.test(key)) fail('INVALID_OPERATION_KEY','操作标识无效'); return path.join(this.dir,`${key}.json`); }
   async get(key){try{return JSON.parse(await readFile(this.file(key),'utf8'));}catch(e){if(e.code==='ENOENT')return null;fail('JOURNAL_UNREADABLE','操作记录损坏，不自动重试');}}
   async begin(key,record){

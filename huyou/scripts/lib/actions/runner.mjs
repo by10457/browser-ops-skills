@@ -1,3 +1,4 @@
+import {storage} from '../../storage.mjs';
 import {pauseBeforeOperation} from '../pacing.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -18,7 +19,7 @@ export async function runAction({workspace,command,task,plan,bindingName,postId,
   if(plan&&hash(binding)!==hash(plan.binding))fail('BINDING_CHANGED','绑定已修改，请重新生成操作计划');
   if(command==='comments'&&!/^\d+$/.test(postId||''))fail('INVALID_TARGET','需要数字字符串 postId');
   const runId=`${new Date().toISOString().replace(/[:.]/g,'-')}-${randomUUID().slice(0,8)}`;
-  const runDir=path.join(workspace,'runs',runId);await mkdir(runDir,{recursive:true});
+  const runDir=storage(workspace,'runs',runId);await mkdir(runDir,{recursive:true});
   const save=(name,data)=>writeFile(path.join(runDir,name),JSON.stringify(data,null,2)+'\n','utf8');
   await save('request.json',{command,task,planDigest:plan?.digest,bindingName:name,postId});
   let cleanupWarning;

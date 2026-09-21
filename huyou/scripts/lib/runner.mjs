@@ -1,3 +1,4 @@
+import {storage} from '../storage.mjs';
 import {pauseBeforeOperation} from './pacing.mjs';
 import { mkdir, readFile, writeFile, open, unlink } from 'node:fs/promises';
 import path from 'node:path';
@@ -15,7 +16,7 @@ export async function bindingFor(workspace, name) {
     if(!/^[a-zA-Z0-9-]+$/.test(name.browserId||'')||!name.expectedAccountName||!name.expectedCircleName)throw new SkillError('BINDING_INCOMPLETE','绑定对象需要 browserId、expectedAccountName、expectedCircleName');
     return structuredClone(name);
   }
-  const config = await readJSON(path.join(workspace, 'config/huyou-bindings.json'));
+  const config = await readJSON(storage(workspace,'config','huyou-bindings.json'));
   const binding = config.bindings?.[name];
   if (config.version !== 1 || !binding?.browserId) throw new SkillError('BINDING_NOT_FOUND', '绑定不存在或缺少 browserId');
   if (!/^[a-zA-Z0-9-]+$/.test(binding.browserId)) throw new SkillError('INVALID_BROWSER_ID', 'browserId 格式不正确');
@@ -35,7 +36,7 @@ export async function preview({ workspace, task, targetId }) {await pauseBeforeO
   validateTask(task);
   const binding = await bindingFor(workspace, task.binding);
   const runId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`;
-  const runDir = path.join(workspace, 'runs', runId);
+  const runDir = storage(workspace,'runs',runId);
   await mkdir(runDir, { recursive: true });
   const save = (name, data) => writeFile(path.join(runDir, name), JSON.stringify(data, null, 2) + '\n', 'utf8');
   await save('task.json', task);

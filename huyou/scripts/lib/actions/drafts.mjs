@@ -1,10 +1,11 @@
+import {storage} from '../../storage.mjs';
 import path from 'node:path';
 import {Journal} from './journal.mjs';
 import {hash,fail} from './schema.mjs';
 
 // Separate from submission records: owning a draft never proves a submission.
 export class DraftStore extends Journal {
-  constructor(workspace){super(workspace);this.dir=path.join(workspace,'drafts');}
+  constructor(workspace){super(workspace);this.dir=storage(workspace,'drafts');}
   async save(key,record){if(await this.get(key))await this.finish(key,record);else await this.begin(key,record);}
 }
 export function assertOwnedDraft(record,plan,targetId){

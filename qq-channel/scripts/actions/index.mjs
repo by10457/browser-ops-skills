@@ -1,3 +1,4 @@
+import {storage} from '../storage.mjs';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {readdir} from 'node:fs/promises';
@@ -12,7 +13,7 @@ import {readSnapshot} from '../lib/dom.mjs';
 import {selectChannel} from '../channels.mjs';
 import {finishPublishedPost} from '../lib/completion.mjs';
 async function run(options,fn){
- await pace();const root=workspacePath(options.workspace),runDir=path.join(root,'qq-channel','runs',randomUUID());
+ await pace();const root=workspacePath(options.workspace),runDir=storage(root,'runs',randomUUID());
  return withQQChannel({...options,workspace:root,managedOnly:true},async session=>{
   const adapter=new ActionAdapter(session.page,session.binding,{workspace:root,runDir});
   try{

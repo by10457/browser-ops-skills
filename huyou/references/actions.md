@@ -6,10 +6,10 @@
 node skills/huyou/scripts/cli.mjs comments --binding my-circle --post POST_ID --workspace workspace
 node skills/huyou/scripts/cli.mjs prepare --task workspace/tasks/my-comment.json --workspace workspace
 # 使用返回的 planFile（plan.json，不是 result.json）：
-node skills/huyou/scripts/cli.mjs rehearse --plan workspace/runs/RUN_ID/plan.json --workspace workspace
+node skills/huyou/scripts/cli.mjs rehearse --plan workspace/runs/huyou/RUN_ID/plan.json --workspace workspace
 # 仅当用户已授权这项具体操作：
-node skills/huyou/scripts/cli.mjs execute --plan workspace/runs/RUN_ID/plan.json --workspace workspace
-node skills/huyou/scripts/cli.mjs reconcile --plan workspace/runs/RUN_ID/plan.json --workspace workspace
+node skills/huyou/scripts/cli.mjs execute --plan workspace/runs/huyou/RUN_ID/plan.json --workspace workspace
+node skills/huyou/scripts/cli.mjs reconcile --plan workspace/runs/huyou/RUN_ID/plan.json --workspace workspace
 ```
 
 ## 任务格式
@@ -47,10 +47,10 @@ POST_ID、COMMENT_AUTHOR、COMMENT_TEXT 和 my-circle 均为占位符，运行�
 
 ## 文件与状态
 
-- runs/运行ID/request.json：本次命令。
-- runs/运行ID/plan.json：prepare 生成的计划，含账号头像、完整目标、正文及 SHA-256 摘要。摘要用于检测误改，不是身份签名或授权凭据。
-- runs/运行ID/result.json：结果、证据与清理警告。
-- operations/操作键.json：提交前持久化 pending，完成后更新 verified-ui/uncertain。任务内容、账号、圈子、帖子及评论目标共同决定操作键；重建计划仍会遇到已有记录。
+- runs/huyou/运行ID/request.json：本次命令。
+- runs/huyou/运行ID/plan.json：prepare 生成的计划，含账号头像、完整目标、正文及 SHA-256 摘要。摘要用于检测误改，不是身份签名或授权凭据。
+- runs/huyou/运行ID/result.json：结果、证据与清理警告。
+- operations/huyou/操作键.json：提交前持久化 pending，完成后更新 verified-ui/uncertain。任务内容、账号、圈子、帖子及评论目标共同决定操作键；重建计划仍会遇到已有记录。
 - locks/窗口ID.lock：同 workspace 下该窗口串行。崩溃遗留锁只在确认旧进程已退出后人工清理。
 
 状态：ready=可供授权执行的计划；rehearsed=填表验证但 submitted:false；verified-ui=得到页面证据；skipped-already-liked/skipped-duplicate=未再提交；uncertain/blocked-uncertain=不能重发。reconcile 仅凭肯定证据更新结果，不能因为“没看到”就允许重试。计划过期仍可只读 reconcile。
