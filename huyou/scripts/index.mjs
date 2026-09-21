@@ -1,6 +1,6 @@
 export {withHuyou} from './session.mjs';
 export {prepareInteraction,executeInteraction} from './actions/unified.mjs';
-export {listOperations,recordOperationEvidence,recoverInteractionPage,classifyInteractionResult} from './operations.mjs';
+export {listOperations,recordOperationEvidence,recoverInteractionPage,recoverOwnedDraft,classifyInteractionResult} from './operations.mjs';
 export {interactionBatchFromPosts,preparePostInteractions} from './batch-targets.mjs';
 export {openUserProfile,readUserProfile,closeUserProfile,withUserProfile} from './profiles.mjs';
 export {prepareFollowUser,followUser} from './actions/follow-user.mjs';

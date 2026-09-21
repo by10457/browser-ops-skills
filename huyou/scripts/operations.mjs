@@ -9,6 +9,31 @@ import {withHuyou} from './session.mjs';
 import {pauseBeforeOperation} from './lib/pacing.mjs';
 import {checkAccount,ensureNoDraft,readDetail,closeDetail} from './lib/actions/dom.mjs';
 import {readSnapshot,assertContext} from './lib/snapshot.mjs';
+import {DraftStore,assertOwnedDraft} from './lib/actions/drafts.mjs';
+import {HuyouAdapter} from './lib/actions/adapter.mjs';
+import {hash} from './lib/actions/schema.mjs';
+
+export async function recoverOwnedDraft(options){
+  const plan=sealedActionPlan(options.plan);
+  if(options.page)fail('MANAGED_SESSION_REQUIRED','草稿恢复需由技能连接并锁定窗口，不接受外部 page');
+  return withHuyou({...options,binding:plan.binding,requireContext:false},async({page,binding,workspace,targetId})=>{
+    await pauseBeforeOperation();
+    const store=new DraftStore(workspacePath(workspace)),record=await store.get(plan.digest);
+    assertOwnedDraft(record,plan,targetId);
+    if(hash(binding)!==hash(plan.binding))fail('BINDING_CHANGED','绑定已变化');
+    const adapter=new HuyouAdapter(page,binding,{plan,targetId,draftStore:store});
+    await checkAccount(page,binding.expectedAccountName,plan.evidence.account);
+    assertContext(await readSnapshot(page),binding);
+    await adapter.assertStaged(plan.task,plan.evidence);
+    const extra=await page.evaluate(selector=>[...document.querySelectorAll('input[type=file]')].some(e=>e.files?.length)||[...document.querySelectorAll('.detail-input__textarea,.publish-editor__content')].some(e=>!e.matches(selector)&&(e.value??e.innerText)?.trim()),record.selector);
+    if(extra)fail('EXISTING_DRAFT','存在其他草稿或附件，保留现场');
+    const dir=path.join(workspacePath(workspace),'recovery',randomUUID());await mkdir(dir,{recursive:true});
+    await writeFile(path.join(dir,'draft.json'),JSON.stringify(record,null,2));
+    await page.screenshot({path:path.join(dir,'page.png')});
+    adapter.ownDraft=record;await adapter.clearOwnDraft();
+    return {status:'draft-cleared',evidenceDir:dir,operationStatusUnchanged:true,nextAction:'reconcile-before-any-resubmission'};
+  });
+}
 
 export function sealedActionPlan(value){const {runId,runDir,planFile,cleanupWarning,...plan}=value;verifyPlan(plan,0);return plan;}
 export async function listOperations({workspace,status,limit=100}={}){

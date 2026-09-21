@@ -8,6 +8,7 @@ import { hash, validateActionTask, verifyPlan, fail } from './schema.mjs';
 import { HuyouAdapter } from './adapter.mjs';
 import { buildActionPlan, executePlan, reconcilePlan } from './engine.mjs';
 import { Journal } from './journal.mjs';
+import {DraftStore} from './drafts.mjs';
 
 export async function runAction({workspace,command,task,plan,bindingName,postId,targetId}) {await pauseBeforeOperation();
   if(command==='prepare') task=validateActionTask(task);
@@ -25,7 +26,7 @@ export async function runAction({workspace,command,task,plan,bindingName,postId,
     const data=await withLock(workspace,binding.browserId,()=>withBrowser({id:binding.browserId},async browser=>{
       // A detail modal changes the query string. Context is checked independently below.
       const tab=selectTab(await listTabs(browser),{origin:'https://hy.sns.sohu.com',targetId});
-      const originalURL=tab.page.url(),adapter=new HuyouAdapter(tab.page,binding);
+      const originalURL=tab.page.url(),adapter=new HuyouAdapter(tab.page,binding,plan?{draftStore:new DraftStore(workspace),plan,targetId:tab.targetId}:{});
       // Chromium may suspend animation frames in background tabs; clicks use them for scrolling.
       await tab.page.bringToFront();
       let result;

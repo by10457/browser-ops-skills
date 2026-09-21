@@ -8,7 +8,7 @@ import {editableText} from './dom.mjs';
 import {prepareFollowUser} from '../../actions/follow-user.mjs';
 
 export class HuyouAdapter {
-  constructor(page, binding, { verifyTimeout = 12000 } = {}) { this.page=page; this.binding=binding; this.verifyTimeout=verifyTimeout; }
+  constructor(page, binding, { verifyTimeout = 12000, draftStore, plan, targetId } = {}) { this.page=page; this.binding=binding; this.verifyTimeout=verifyTimeout; this.draftStore=draftStore;this.plan=plan;this.targetId=targetId; }
   async prepare(task, expected) {
     const page=this.page;
     await ensureNoDraft(page);
@@ -65,18 +65,27 @@ export class HuyouAdapter {
     const current=await el.evaluate(e=>({text:e.value??e.innerText,max:e.maxLength}));
     if(current.text.trim()) fail('EXISTING_DRAFT','编辑器已有内容，拒绝覆盖');
     if(Number.isInteger(current.max)&&current.max>=0&&text.length>current.max) fail('TEXT_TOO_LONG','文本超过页面实际输入限制');
+    const placeholder=await el.evaluate(e=>e.getAttribute('placeholder'));
+    const record={status:'intent',planDigest:this.plan?.digest,binding:this.binding,targetId:this.targetId,selector,text,placeholder,at:new Date().toISOString()};
+    if(this.draftStore)await this.draftStore.save(this.plan.digest,record);
     await el.click(); await this.page.keyboard.sendCharacter(text);
     const value=await el.evaluate(editableText);
-    this.ownDraft={selector,text:normalizeText(value)};
-    if(normalizeText(value)!==text) fail('TEXT_CHANGED','输入内容与任务不一致，不提交');
+    if(value!==text) fail('TEXT_CHANGED','输入内容与任务不一致，不提交');
+    this.ownDraft={selector,text,placeholder};
+    if(this.draftStore)await this.draftStore.save(this.plan.digest,{...record,status:'owned'});
   }
   async clearOwnDraft() {
     if(!this.ownDraft) return;
     const {selector,text}=this.ownDraft;
     const el=await this.page.$(selector);
-    if(el&&normalizeText(await el.evaluate(editableText))===text) {
+    if(el&&await el.evaluate(editableText)===text) {
+      if(await el.evaluate(e=>e.getAttribute('placeholder'))!==this.ownDraft.placeholder)fail('DRAFT_TARGET_CHANGED','输入框目标变化，保留草稿');
       await el.click(); await this.page.keyboard.down('Control'); await this.page.keyboard.press('KeyA'); await this.page.keyboard.up('Control'); await this.page.keyboard.press('Backspace');
+      if(await el.evaluate(editableText)!=='')fail('DRAFT_CLEAR_FAILED','草稿未清空');
+    } else if(el&&(await el.evaluate(editableText)).trim()) {
+      fail('DRAFT_CHANGED','草稿已被修改，保留现场');
     }
+    if(this.draftStore){const r=await this.draftStore.get(this.plan.digest);if(r)await this.draftStore.save(this.plan.digest,{...r,status:'released',releasedAt:new Date().toISOString()});}
     this.ownDraft=null;
   }
   async stage(task,evidence) {

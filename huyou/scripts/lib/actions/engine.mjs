@@ -37,10 +37,20 @@ export async function reconcilePlan(plan,adapter,journal) {
   if(!prior)fail('NO_OPERATION','没有需要核对的提交记录');
   if(['verified-ui','skipped-already-liked','skipped-already-followed','confirmed-by-user'].includes(prior.status))return {status:prior.status,operationKey:key};
   if(!prior.baseline)return {status:'uncertain',operationKey:key,reason:'外部记录缺少提交前基线，不能自动核验；保留记录，等待独立证据或用户确认'};
-  // May leave a draft after a timed-out submit. Do not overwrite or silently clear it.
-  if(plan.task.action!=='publish') await adapter.prepare(plan.task,plan.evidence);
-  const evidence=await adapter.verifyOnce(plan.task,plan.evidence,prior.baseline);
-  if(!evidence)return {status:'uncertain',operationKey:key,reason:'仍未取得肯定证据，未重新提交'};
+  // Read the existing target first: a residual draft must not hide a successful result.
+  let evidence,blocked;
+  try {
+    evidence=await adapter.verifyOnce(plan.task,plan.evidence,prior.baseline);
+    if(!evidence&&plan.task.action!=='publish'){
+      await adapter.prepare(plan.task,plan.evidence);
+      evidence=await adapter.verifyOnce(plan.task,plan.evidence,prior.baseline);
+    }
+  }catch(e){blocked={code:e.code||'RECONCILE_FAILED',message:e.message};}
+  if(!evidence){
+    const result={status:'uncertain',operationKey:key,reason:'仍未取得肯定证据，未重新提交',...(blocked?{error:blocked}:{}),nextAction:blocked?.code==='EXISTING_DRAFT'?'inspect-owned-draft':'inspect-evidence'};
+    await journal.finish(key,{...prior,lastReconciliation:{at:new Date().toISOString(),...result}});
+    return result;
+  }
   await journal.finish(key,{...prior,status:'verified-ui',evidence,reconciledAt:new Date().toISOString()});
   return {status:'verified-ui',operationKey:key,evidence};
 }

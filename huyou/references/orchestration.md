@@ -45,3 +45,17 @@ action 支持 like-post、follow-user；follow-user 默认按作者昵称与头�
 queryResult.posts.map(p => ({postId:p.id,authorName:p.author.name,time:p.publishedLabel,text:p.text}));
 commentsResult.comments.map(c => ({authorName:c.authorName,text:c.text,stickers:c.stickers}));
 ```
+## 残留草稿与核对
+
+文本动作在输入前记录意图，完整输入后将归属写入 workspace/drafts。记录包含原计划摘要、窗口绑定、标签 ID、完整文本和输入框目标。输入中断、文本被修改、标签被重新创建或旧版本未保存归属时，不能自动认领。
+
+`recoverOwnedDraft({workspace, plan, targetId})` 仅清理原计划拥有的完整草稿，清理前保存截图和记录。它重新检查账号、圈子、帖子/回复目标和表单；其他草稿、附件或无法核实的表单会阻止清理。此接口自己连接并锁定窗口，不接受 page，不应在 withHuyou 回调中调用。
+
+```js
+await recoverOwnedDraft({workspace, plan, targetId});
+const result = await executeInteraction({workspace, plan, targetId, mode:'reconcile'});
+```
+
+恢复不会删除 operations 记录，也不代表提交失败。曾进入提交阶段的动作只能先核对，不能因为草稿清空而重发。没有提交记录时，reconcile 返回 NO_OPERATION；此时检查原运行记录，按正常执行流程处理。
+
+reconcile 先读取当前目标的结果，再尝试准备读取位置。草稿挡住核对时返回 uncertain、error.code 和 nextAction，并在操作日志保存 lastReconciliation；不会点击提交。旧计划仍可核对，但过期计划不能重新提交。快捷点赞仍不能仅凭计数增长或 HTTP 成功确认本人操作。
