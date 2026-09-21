@@ -2,7 +2,7 @@
 
 基于比特浏览器的多窗口、多账号社交平台自动化运营技能集，供 AI Agent 和 Node.js 程序调用。
 
-项目把浏览器窗口管理与平台操作拆成独立技能：比特浏览器负责窗口与连接，平台技能负责页面读取、账号核对、内容操作及执行结果核对。目前已包含 **比特浏览器** 和 **狐友社区**，后续可按相同结构扩展 QQ 频道、抖音、小红书、微博等平台。
+项目把浏览器窗口管理与平台操作拆成独立技能：比特浏览器负责窗口与连接，平台技能负责页面读取、账号核对、内容操作及执行结果核对。目前包含 **比特浏览器**、**狐友社区** 和 **QQ 频道论坛**，后续可按相同结构扩展其他平台。
 
 > 项目仓库：[by10457/browser-ops-skills](https://github.com/by10457/browser-ops-skills)。
 
@@ -12,7 +12,8 @@
 | --- | --- | --- |
 | [bitbrowser](bitbrowser/SKILL.md) | 已实现 | 本地服务诊断、窗口查询与数量检查、创建/启动/关闭/删除窗口、清理 Cookie 或缓存、修改名称与备注、打开网页、标签页管理及浏览器连接 |
 | [huyou](huyou/SKILL.md) | 已实现 | 账号和圈子检查、帖子与评论查询、作者主页读取、帖子点赞、评论及回复、评论点赞、关注作者、纯文本发布、多窗口批次和结果核对 |
-| QQ 频道、抖音、小红书、微博等 | 扩展方向，尚未实现 | 后续分别增加平台适配与测试；当前不能直接调用这些平台的运营动作 |
+| [qq-channel](qq-channel/SKILL.md) | 首版 | 我的频道与帖子版块、帖子及评论读取、图文发帖、帖子点赞、文字评论、顶层回复和结果核对；真实提交验收见宿主测试记录 |
+| 抖音、小红书、微博等 | 扩展方向，尚未实现 | 后续分别增加平台适配与测试 |
 
 多账号任务通过“浏览器窗口 ID + 预期账号 + 平台上下文”区分操作对象。当前项目复用窗口中已有的登录状态，**不包含自动注册或通用自动登录功能**；遇到登录失效，需要先在对应窗口完成登录。
 
@@ -38,6 +39,7 @@ skills/
 │   ├── examples/       # 参数示例
 │   ├── agents/         # Agent 元数据
 │   └── tests/          # 测试代码
+├── qq-channel/          # QQ 频道论坛操作，独立说明、脚本、参考、示例和测试
 └── huyou/               # 狐友平台操作
     ├── SKILL.md
     ├── scripts/
@@ -69,7 +71,7 @@ git clone https://github.com/by10457/browser-ops-skills.git skills
 node -e "require('node:fs').mkdirSync('workspace/config', { recursive: true })"
 ```
 
-后续命令均从宿主项目根目录执行，依赖也安装在该目录，不要在 `bitbrowser/` 或 `huyou/` 内安装 `node_modules`。已有宿主项目时可直接安装依赖并放入技能，无需重新初始化。示例中的两个技能相邻存放，无需额外设置环境变量；分开放置或使用其他适配器时，参见各技能的接入说明。
+后续命令均从宿主项目根目录执行，依赖也安装在该目录，不要在任何技能目录内安装 `node_modules`。已有宿主项目时可直接安装依赖并放入技能，无需重新初始化。平台技能与 bitbrowser 相邻存放时无需额外设置适配器环境变量；分开放置时参见各技能的接入说明。
 
 ### 2. 检查比特浏览器
 
@@ -156,3 +158,4 @@ node skills/huyou/scripts/cli.mjs query --binding account-a --workspace ./worksp
 
 - [比特浏览器技能](bitbrowser/SKILL.md) · [接入说明](bitbrowser/references/setup.md) · [窗口管理](bitbrowser/references/management.md) · [诊断](bitbrowser/references/diagnostics.md)
 - [狐友技能](huyou/SKILL.md) · [接入说明](huyou/references/setup.md) · [查询 API](huyou/references/api.md) · [单项操作](huyou/references/actions.md) · [批次操作](huyou/references/batches.md)
+- [QQ 频道技能](qq-channel/SKILL.md) · [接入说明](qq-channel/references/setup.md) · [API](qq-channel/references/api.md) · [动作与恢复](qq-channel/references/actions.md)
