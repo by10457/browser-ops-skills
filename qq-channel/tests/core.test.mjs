@@ -12,7 +12,7 @@ import {assertContext,assertNoDraft} from '../scripts/lib/dom.mjs';
 import {resolveComment} from '../scripts/comments.mjs';
 import {filterPosts,normalizeQuery,parsePostTime,resolvePost,queryPosts} from '../scripts/posts.mjs';
 import {validateBinding} from '../scripts/session.mjs';
-import {confirmPreviews} from '../scripts/lib/action-adapter.mjs';
+import {ActionAdapter,commentActor,confirmPreviews,postIdentity} from '../scripts/lib/action-adapter.mjs';
 const binding={browserId:'test',expectedAccountName:'global',expectedChannelName:'channel',channelId:'abc',expectedChannelAccountName:'alias'};
 const target={url:'https://pd.qq.com/g/abc/post/B_testX60?subc=12'};
 function plan(action='comment'){const task=validateTask({action,target,...(action==='like-post'?{}:{content:{text:'hello'}})},binding);return sealPlan({version:1,kind:'qq-channel-action-plan',binding,task,images:[],evidence:{account:{name:'global',channelName:'alias'},post:{id:'B_testX60'}},expiresAt:new Date(Date.now()+900000).toISOString()});}
@@ -36,6 +36,14 @@ test('comment resolution rejects duplicate identities and nested replies',()=>{
  const c={id:'c_a',author:{name:'a'},text:'same',isReply:false};assert.equal(resolveComment([c],{id:'c_a'}),c);
  assert.throws(()=>resolveComment([c,{...c,id:'c_b'}],{authorName:'a',text:'same'}),{code:'AMBIGUOUS_TARGET'});
  assert.throws(()=>resolveComment([{...c,isReply:true}],{id:'c_a'}),{code:'NESTED_REPLY_UNSUPPORTED'});
+});
+test('comment verification uses published channel identity, not feed composer identity',async()=>{
+ const post={id:'B_testX60',channelId:'abc',author:{name:'student',avatar:'https://a/student'},text:'hello'};
+ const actor={name:'alias',avatar:'https://a/alias'};
+ const prepared={binding:{...binding,expectedInteractionAccountName:'global',expectedCommentAuthorName:actor.name,expectedCommentAuthorAvatar:actor.avatar},task:{action:'comment',content:{text:'reply'}},evidence:{account:{channelName:'global',channelAvatar:'https://a/global',avatar:'https://a/global'},post:postIdentity(post)}};
+ assert.deepEqual(commentActor(prepared),actor);
+ const a=new ActionAdapter({},prepared.binding);a.snapshot=async()=>({account:{avatar:'https://a/global'},detail:{...post,comments:[{id:'c_new',author:actor,text:'reply',isReply:false}]}});
+ assert.deepEqual(await a.verifyOnce(prepared,{commentIds:[]}),{source:'new-own-comment',commentId:'c_new',parentId:undefined});
 });
 test('query date range and truncated text never imply complete results',()=>{
  assert.equal(parsePostTime('2026-09-21').start,Date.parse('2026-09-21T00:00:00+08:00'));assert.equal(parsePostTime('2026-02-30'),null);

@@ -1,6 +1,19 @@
-import {pace,fail,unique} from './lib/core.mjs';
+import {pace,fail,unique,route} from './lib/core.mjs';
 import {selectPostView} from './channels.mjs';
-import {ready,readSnapshot,assertNoDraft,assertContext,selectors} from './lib/dom.mjs';
+import {ready,readSnapshot,assertNoDraft,assertContext,clickUnique,selectors} from './lib/dom.mjs';
+export async function returnToChannel(page,binding){
+ await pace();const before=await ready(page);assertContext(before,binding);assertNoDraft(before);
+ if(before.pageType==='feed')return {status:'already-in-channel',url:before.url};
+ if(before.pageType!=='post')fail('UNSUPPORTED_PAGE','返回频道需要帖子详情页');
+ const selector='.game-guild-detail-title-bar a.bar-left[href]';
+ const links=await page.$$(selector);if(links.length!==1)fail('CHANNEL_LINK_AMBIGUOUS','未找到唯一的去频道入口');
+ const href=await links[0].evaluate(e=>e.href);const target=route(href);
+ if(target.channelId!==binding.channelId||target.postId)fail('CHANNEL_LINK_CHANGED','去频道入口不是绑定频道');
+ await clickUnique(page,selector);
+ await page.waitForFunction(id=>location.pathname===`/g/${id}`||location.pathname===`/g/${id}/`,{timeout:15000},binding.channelId);
+ const after=await ready(page);assertContext(after,binding);if(after.pageType!=='feed')fail('CHANNEL_RETURN_FAILED','未返回频道列表');
+ return {status:'returned',url:after.url,viewsInitialized:false};
+}
 export async function backToTop(page,binding){
  await pace();const s=await ready(page);assertContext(s,binding);assertNoDraft(s);
  const css=s.pageType==='feed'?selectors.feedScroll:selectors.detailScroll;

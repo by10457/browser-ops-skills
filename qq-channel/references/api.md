@@ -28,6 +28,7 @@ await withQQChannel({workspace,binding,targetId}, async ({page,binding}) => {
 - `loadMore(page,binding,{timeoutMs=8000})` 每次滚动约一个视口，返回 progress、stopReason。loadMoreComments 用于详情评论区。
 - `selectChannel` 成功后自动初始化帖子类型，返回 initialization（status、via、selectedView、views、warnings）。`initializePostViews(page,binding)` 可单独初始化当前频道：优先热门 → 全部；没有热门用其他类型中转；只有全部时重新选择。没有类型返回 no-views；有类型却没有全部时停止。
 - `backToTop(page,binding)` 操作列表或详情自身的滚动容器，核对到顶后返回 container、from、to；不滚动频道侧栏。
+- `returnToChannel(page,binding)` 在详情页点击“去频道”并核对频道列表，不切换帖子类型；已在频道列表时返回 already-in-channel。用于一批互动完成后返回，下一轮扫描再初始化类型。
 - `refreshFeed(page,binding)` 仅支持帖子列表：全部 → 另一类型 → 全部；其他类型 → 全部 → 原类型。禁止整页刷新，不改变最终选中类型。返回 originalView、alternateView、selectedView、method、url；complete:false 表示重新选择类型不保证服务端全量或最新数据。没有替代类型、已有草稿、频道变化时停止；中途失败需核对当前类型后再继续。
 
 帖子对象包含原始字符串 id、url、channelId、boardId、author、text、textTruncated、publishedLabel、images。时间筛选返回 publishedTime 时间区间，默认按上海时区解释页面日期。热门列表不能用于推断最新顺序。

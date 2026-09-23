@@ -2,12 +2,15 @@ import {pace,fail,hash,avatarIdentity,saveJSON,route} from './core.mjs';
 import {selectors,readSnapshot,ready,assertContext,assertNoDraft,clickUnique,clickText} from './dom.mjs';
 import {openPost} from '../posts.mjs';
 import {selectChannel} from '../channels.mjs';
+import {backToTop} from '../navigation.mjs';
 import {resolveComment} from '../comments.mjs';
 import {verifyImages} from './files.mjs';
 import path from 'node:path';
 
 export const postIdentity=p=>({id:p.id,channelId:p.channelId,author:{name:p.author.name,avatar:avatarIdentity(p.author.avatar)},text:p.text});
 export const commentIdentity=c=>({id:c.id,author:{name:c.author.name,avatar:avatarIdentity(c.author.avatar)},text:c.text,isReply:c.isReply,parentId:c.parentId});
+export function commentActor(plan){const name=plan.binding.expectedCommentAuthorName||plan.binding.expectedChannelAccountName||plan.evidence.account.channelName;const avatar=plan.binding.expectedCommentAuthorAvatar||(name===plan.evidence.account.channelName?plan.evidence.account.channelAvatar:null);return {name,avatar:avatar?avatarIdentity(avatar):null};}
+const matchesActor=(author,actor)=>author.name===actor.name&&(!actor.avatar||avatarIdentity(author.avatar)===actor.avatar);
 export function confirmPreviews(previews,expectedCount){
  if(previews.length!==expectedCount||previews.some(p=>!p.ready||!/^https:\/\//.test(p.src||'')))fail('UPLOAD_UNVERIFIED','图片预览数量、远程地址或加载状态未确认；保留草稿');
  return previews.map(p=>p.src);
@@ -15,18 +18,31 @@ export function confirmPreviews(previews,expectedCount){
 export class ActionAdapter {
  constructor(page,binding,{workspace,runDir,verifyTimeoutMs=12000}={}){Object.assign(this,{page,binding,workspace,runDir,verifyTimeoutMs});}
  async snapshot(){const s=await readSnapshot(this.page);assertContext(s,this.binding);return s;}
- async openComposer(){
+ async openComposer(action){
   const s=await ready(this.page);assertContext(s,this.binding);assertNoDraft(s);
   if(s.pageType!=='feed')await selectChannel(this.page,this.binding);
+  // Feed virtualization hides the editor after a long scan. Restore the top before reading channel identity.
+  await backToTop(this.page,this.binding);
   if(!await this.page.$(selectors.editor)||!(await readSnapshot(this.page)).account.channelName)await clickUnique(this.page,'.editor-header');
-  await this.page.waitForSelector(selectors.editor,{timeout:10000});
-  if(!this.binding.expectedChannelAccountName)fail('CHANNEL_ACCOUNT_REQUIRED','发送动作需要 expectedChannelAccountName（频道内昵称）');
-  await this.page.waitForFunction(n=>document.querySelector('.editor-header .user-name')?.textContent.trim()===n,{timeout:10000},this.binding.expectedChannelAccountName);
-  const after=await this.snapshot();assertNoDraft(after);return after;
+  await this.page.waitForSelector(selectors.editor,{visible:true,timeout:10000});
+  const expected=['comment','like-post'].includes(action)?this.binding.expectedInteractionAccountName||this.binding.expectedChannelAccountName:this.binding.expectedChannelAccountName;
+  if(!expected)fail('CHANNEL_ACCOUNT_REQUIRED','发送动作需要配置频道内昵称');
+  const after=await this.snapshot();assertNoDraft(after);
+  if(after.account.channelName!==expected)fail('CHANNEL_ACCOUNT_MISMATCH',`当前互动身份为「${after.account.channelName||'未知'}」，预期「${expected}」`);
+  return after;
  }
  async prepare(task){
-  await pace();const own=await this.openComposer();
-  const account={name:own.account.name,avatar:avatarIdentity(own.account.avatar),channelName:own.account.channelName,channelAvatar:avatarIdentity(own.account.channelAvatar)};
+  await pace();
+  const direct=this.binding.directPostPreparation&&['comment','like-post'].includes(task.action);
+  let own,account;
+  if(direct){
+   own=await ready(this.page);assertContext(own,this.binding);assertNoDraft(own);
+   if(!this.binding.expectedInteractionAccountName||!this.binding.expectedInteractionAccountAvatar||!this.binding.expectedCommentAuthorName||!this.binding.expectedCommentAuthorAvatar)fail('DIRECT_IDENTITY_REQUIRED','直接进入帖子需要预先核验互动身份及评论署名、头像');
+   account={name:own.account.name,avatar:avatarIdentity(own.account.avatar),channelName:this.binding.expectedInteractionAccountName,channelAvatar:avatarIdentity(this.binding.expectedInteractionAccountAvatar)};
+  }else{
+   own=await this.openComposer(task.action);
+   account={name:own.account.name,avatar:avatarIdentity(own.account.avatar),channelName:own.account.channelName,channelAvatar:avatarIdentity(own.account.channelAvatar)};
+  }
   if(!account.channelAvatar)fail('ACCOUNT_UNKNOWN','无法读取频道身份头像');
   if(task.action==='publish'){
    if(!own.composer.textLimit||task.content.text.length>own.composer.textLimit)fail('TEXT_LIMIT','未读到发布上限或正文超限');
@@ -72,9 +88,9 @@ export class ActionAdapter {
   const {task}=plan,s=await this.snapshot();assertNoDraft(s);
   const baseline={postIds:s.posts.map(p=>p.id),commentIds:s.detail?.comments.map(c=>c.id)||[],like:s.detail?.like||null,stagedAt:new Date().toISOString()};
   if(task.action==='like-post')return baseline;
-  const own=plan.evidence.account;
+  const own=plan.evidence.account,actor=commentActor(plan);
   if(task.action==='publish'&&s.posts.some(p=>p.author.name===own.channelName&&avatarIdentity(p.author.avatar)===own.channelAvatar&&!p.textTruncated&&p.text===task.content.text&&p.images.length===plan.images.length))fail('EXISTING_IDENTICAL_CONTENT','已加载列表有同文同数量附件帖子，先核对');
-  if(task.action!=='publish'&&s.detail.comments.some(c=>c.author.name===own.channelName&&avatarIdentity(c.author.avatar)===own.channelAvatar&&c.text===task.content.text&&(task.action==='reply'?c.parentId===plan.evidence.comment.id:!c.isReply)))fail('EXISTING_IDENTICAL_CONTENT','目标位置已有本人同文评论，先核对');
+  if(task.action!=='publish'&&s.detail.comments.some(c=>matchesActor(c.author,actor)&&c.text===task.content.text&&(task.action==='reply'?c.parentId===plan.evidence.comment.id:!c.isReply)))fail('EXISTING_IDENTICAL_CONTENT','目标位置已有本人同文评论，先核对');
   if(task.action==='reply'){
     const c=resolveComment(s.detail.comments,task.target.comment),handles=await this.page.$$(selectors.comment),matches=[];
     for(const e of handles)if(await e.evaluate((n,id)=>n.id===id,c.id))matches.push(e);
@@ -135,7 +151,7 @@ export class ActionAdapter {
   }
   if(!s.detail||hash(postIdentity(s.detail))!==hash(evidence.post))return null;
   if(task.action==='like-post')return s.detail.like.state==='liked'?{source:'explicit-liked-state'}:null;
-  const found=s.detail.comments.filter(c=>!baseline.commentIds.includes(c.id)&&c.id&&c.author.name===evidence.account.channelName&&avatarIdentity(c.author.avatar)===evidence.account.channelAvatar&&c.text===task.content.text&&(task.action==='reply'?c.isReply&&c.parentId===evidence.comment.id:!c.isReply));
+  const actor=commentActor(plan);const found=s.detail.comments.filter(c=>!baseline.commentIds.includes(c.id)&&c.id&&matchesActor(c.author,actor)&&c.text===task.content.text&&(task.action==='reply'?c.isReply&&c.parentId===evidence.comment.id:!c.isReply));
   return found.length===1?{source:'new-own-comment',commentId:found[0].id,parentId:found[0].parentId}:null;
  }
  async verify(plan,baseline){
@@ -148,6 +164,7 @@ export class ActionAdapter {
   const current=await this.verifyOnce(plan,record.baseline);if(current)return current;
   const s=await this.snapshot();assertNoDraft(s);
   if(plan.task.action!=='publish'){await openPost(this.page,this.binding,plan.task.target.url);await this.page.waitForSelector('.comment-bar__comment-count,.has-no-comment',{timeout:15000});}
-  return this.verifyOnce(plan,record.baseline);
+  const until=Date.now()+6000;do{const evidence=await this.verifyOnce(plan,record.baseline);if(evidence)return evidence;await new Promise(r=>setTimeout(r,400));}while(Date.now()<until);
+  return null;
  }
 }

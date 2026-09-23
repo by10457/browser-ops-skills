@@ -14,11 +14,18 @@ Node.js 版本见 package.json。本包没有运行时第三方依赖；默认�
   channelId: '频道网址中 /g/ 后的标识',
   expectedChannelName: '频道完整名称',
   expectedAccountName: '左侧底部全局昵称',
-  expectedChannelAccountName: '发布编辑器中的频道昵称'
+  expectedChannelAccountName: '发帖或回复时的频道昵称',
+  expectedInteractionAccountName: '可选：互动准备时编辑器显示的昵称',
+  expectedInteractionAccountAvatar: '可选：已核验的互动编辑器头像',
+  expectedCommentAuthorName: '可选：实际评论署名',
+  expectedCommentAuthorAvatar: '可选：实际评论头像',
+  directPostPreparation: false
 }
 ```
 
-expectedChannelAccountName 在发送时必需；只读可省略。可选 expectedAccountAvatar 用于额外核对全局头像。频道 avatar 只是页面身份证据，不能当作 UID。
+expectedChannelAccountName 在发送时必需；只读可省略。若评论、点赞准备时编辑器显示不同昵称，设置 expectedInteractionAccountName；未设置时沿用 expectedChannelAccountName。若评论在帖子下实际使用另一署名，设置 expectedCommentAuthorName 和可选的 expectedCommentAuthorAvatar 供去重与核验。技能不会自行猜测或切换身份。可选 expectedAccountAvatar 用于额外核对全局头像。频道 avatar 只是页面身份证据，不能当作 UID。
+
+大量逐帖评论/点赞时，可显式设置 `directPostPreparation:true`，并同时填写上述互动昵称、互动头像、评论署名和评论头像。此时准备阶段在当前详情页核对全局账号后直接打开目标详情 URL，不为了读取列表编辑器身份而返回频道。配置前应从已确认的页面及历史成功操作核对四项身份信息；不满足条件时保持默认路径，不猜测身份。
 
 仅发现频道时可以使用 `withQQChannel({workspace,binding:{browserId,expectedAccountName},requireContext:false}, ...)` 配合 inspect / listChannels，无需先知道目标频道。频道操作和发送仍必须补全绑定。
 
